@@ -27,27 +27,32 @@ jobs:
       - name: Patch CMakeLists.txt
         run: |
           cd xLua/build
-          if ! grep -q "lua-protobuf" CMakeLists.txt; then
-            sed -i '' '/^endif ()$/,/^set ( LUA_SOCKET/{
-              /^set ( LUA_SOCKET/i\
-\
-#begin lua-protobuf\
-set (LUAPB_SRC lua-protobuf/pb.c)\
-set_property(\
-    SOURCE ${LUAPB_SRC}\
-    APPEND\
-    PROPERTY COMPILE_DEFINITIONS\
-    LUA_LIB\
-)\
-list(APPEND THIRDPART_INC lua-protobuf)\
-set (THIRDPART_SRC ${THIRDPART_SRC} ${LUAPB_SRC})\
-#end lua-protobuf\
+          python3 -c "
+          import re
+          with open('CMakeLists.txt', 'r') as f:
+              content = f.read()
+          if 'lua-protobuf' not in content:
+              patch = '''
+          #begin lua-protobuf
+          set (LUAPB_SRC lua-protobuf/pb.c)
+          set_property(
+              SOURCE \${LUAPB_SRC}
+              APPEND
+              PROPERTY COMPILE_DEFINITIONS
+              LUA_LIB
+          )
+          list(APPEND THIRDPART_INC lua-protobuf)
+          set (THIRDPART_SRC \${THIRDPART_SRC} \${LUAPB_SRC})
+          #end lua-protobuf
 
-            }' CMakeLists.txt
-            echo "CMakeLists.txt patched"
-          else
-            echo "CMakeLists.txt already patched"
-          fi
+          '''
+              content = content.replace('set ( LUA_SOCKET', patch + 'set ( LUA_SOCKET', 1)
+              with open('CMakeLists.txt', 'w') as f:
+                  f.write(content)
+              print('CMakeLists.txt patched')
+          else:
+              print('CMakeLists.txt already patched')
+          "
 
       # ---- iOS (ARM64 静态库) ----
       - name: Build iOS
