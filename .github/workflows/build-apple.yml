@@ -1,0 +1,88 @@
+name: Build iOS & macOS
+
+# 手动触发，也可以在 push 时自动触发
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'lua-protobuf/pb.c'
+      - 'lua-protobuf/pb.h'
+      - 'xLua/build/CMakeLists.txt'
+
+jobs:
+  build-apple:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---- 准备 lua-protobuf 源码 ----
+      - name: Copy pb sources
+        run: |
+          mkdir -p xLua/build/lua-protobuf
+          cp lua-protobuf/pb.c xLua/build/lua-protobuf/
+          cp lua-protobuf/pb.h xLua/build/lua-protobuf/
+
+      # ---- 修改 CMakeLists.txt ----
+      - name: Patch CMakeLists.txt
+        run: |
+          cd xLua/build
+          if ! grep -q "lua-protobuf" CMakeLists.txt; then
+            sed -i '' '/^endif ()$/,/^set ( LUA_SOCKET/{
+              /^set ( LUA_SOCKET/i\
+\
+#begin lua-protobuf\
+set (LUAPB_SRC lua-protobuf/pb.c)\
+set_property(\
+    SOURCE ${LUAPB_SRC}\
+    APPEND\
+    PROPERTY COMPILE_DEFINITIONS\
+    LUA_LIB\
+)\
+list(APPEND THIRDPART_INC lua-protobuf)\
+set (THIRDPART_SRC ${THIRDPART_SRC} ${LUAPB_SRC})\
+#end lua-protobuf\
+
+            }' CMakeLists.txt
+            echo "CMakeLists.txt patched"
+          else
+            echo "CMakeLists.txt already patched"
+          fi
+
+      # ---- iOS (ARM64 静态库) ----
+      - name: Build iOS
+        run: |
+          cd xLua/build
+          bash make_ios_lua53.sh
+
+      # ---- macOS Intel (x86_64) ----
+      - name: Build macOS Intel
+        run: |
+          cd xLua/build
+          bash make_osx_lua53.sh
+
+      # ---- macOS Apple Silicon (ARM64) ----
+      - name: Build macOS ARM
+        run: |
+          cd xLua/build
+          bash make_osx_silicon_lua53.sh
+
+      # ---- 上传产物 ----
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xlua-ios-lua53
+          path: xLua/build/plugin_lua53/Plugins/iOS/
+
+      - name: Upload macOS Intel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xlua-macos-intel-lua53
+          path: xLua/build/plugin_lua53/Plugins/xlua.bundle
+
+      - name: Upload macOS ARM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xlua-macos-arm-lua53
+          path: xLua/build/plugin_lua53/Plugins/xlua.bundle
+          # macOS ARM 会覆盖 Intel 的 bundle，如需两者都保留可分开目录

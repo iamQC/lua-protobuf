@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find e:/lua-protobuf -type f -name README* -o -name *.md)",
+      "Bash(find e:/lua-protobuf/xLua/Assets/XLua -type f -name *.cs -path */Src/*)",
+      "Bash(find e:/lua-protobuf -name *.md -o -name *.txt -o -name README*)",
+      "Bash(ls e:/lua-protobuf/xLua/build/make_*)"
+    ]
+  }
+}
